@@ -81,8 +81,10 @@
 
     <script>
         // --- CONFIGURACIÓN ---
-        // ¡¡IMPORTANTE!! Reemplaza esto con la URL de tu función de Vercel
-        const VERCEL_ENDPOINT_URL = "https://TU-PROYECTO.vercel.app/api/guardar-imagen"; // <-- ¡EDITAR ESTO!
+        // ¡¡CAMBIO IMPORTANTE!!
+        // Esta es una ruta relativa porque el frontend y el backend
+        // ahora se sirven desde el mismo dominio de Vercel.
+        const VERCEL_ENDPOINT_URL = "/api/guardar-imagen";
         // ---------------------
 
         const video = document.getElementById('video');
